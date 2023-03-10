@@ -1,0 +1,90 @@
+services:
+  auth-db:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: sanyam1969
+      POSTGRES_USER: postgres
+      PGUSER: postgres
+      POSTGRES_DB: auth
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready
+      interval: 10s
+      retries: 20
+
+  redis:
+    image: redis
+
+  auth-db-migration:
+    build:
+      context: ../auth
+      dockerfile: Dockerfile.migrations
+    environment:
+      NODE_ENV: docker
+      POSTGRES_HOST: auth-db
+      POSTGRES_DB: auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 'sanyam1969'
+      POSTGRES_PORT: 5432
+    depends_on:
+      auth-db:
+        condition: service_healthy
+
+  auth-service:
+    build:
+      context: ../auth
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: docker
+      POSTGRES_HOST: auth-db
+      POSTGRES_DB: auth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 'sanyam1969'
+      POSTGRES_PORT: 5432
+      redis_host: redis
+      redis_port: 6379
+      PORT: 5001
+    ports:
+      - 5001:5001
+    depends_on:
+      auth-db:
+        condition: service_healthy
+
+  cms-db:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: sanyam1969
+      POSTGRES_USER: postgres
+      PGUSER: postgres
+      POSTGRES_DB: cms
+    volumes:
+      - ./cms_data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready
+      interval: 10s
+      retries: 20
+
+  cms-db-migration:
+    build:
+      context: ../server
+      dockerfile: Dockerfile.migrations
+    environment:
+      NODE_ENV: docker
+    depends_on:
+      cms-db:
+        condition: service_healthy
+
+  cms-service:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: docker
+    depends_on:
+      cms-db:
+        condition: service_healthy
+      cms-db-migration:
+        condition: service_completed_successfully
+    ports:
+      - 8000:8000
